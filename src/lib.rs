@@ -1,4 +1,11 @@
-use nom::{bytes::complete::tag, combinator::map_res, number::complete::hex_u32, IResult};
+use nom::{
+    bytes::complete::{tag, take_while},
+    combinator::map_res,
+    number::complete::hex_u32,
+    AsChar, IResult,
+};
+
+type Opcode = u32;
 
 /// Parses the KMD tag at the start of every .kmd file
 fn kmd_tag(input: &str) -> IResult<&str, &str> {
@@ -9,7 +16,9 @@ fn hex_to_int(input: &str) -> Result<u32, std::num::ParseIntError> {
     u32::from_str_radix(input, 16)
 }
 
-fn memory_address(input: &str) -> IResult<&str, u32> {
+fn hex(input: &str) -> IResult<&str, u32> {
+    let (remaining, hex): (&str, &str) = take_while(|c: char| c.is_alphanum() || c == ' ')(input)?;
+
     map_res(
         nom::bytes::complete::take_while(|c: char| c.is_ascii_hexdigit()),
         hex_to_int,
@@ -22,9 +31,7 @@ pub fn parse_kmd(input: &str) {
 
 #[cfg(test)]
 mod tests {
-    use nom_test_helpers::{
-        assert_done_and_eq, assert_error, assert_error_and_eq, assert_finished,
-    };
+    use nom_test_helpers::{assert_done_and_eq, assert_error, assert_finished};
 
     use super::*;
 
@@ -44,5 +51,20 @@ mod tests {
         let (remaining, tag) = kmd_tag("KMD\nextra").unwrap();
         assert_eq!(tag, "KMD\n");
         assert_eq!(remaining, "extra");
+    }
+
+    #[test]
+    fn test_hex_valid() {
+        assert_done_and_eq!(hex("0000000C"), 12)
+    }
+
+    #[test]
+    fn test_hex_invalid() {
+        assert_error!(hex("notamemoryaddress"));
+    }
+
+    #[test]
+    fn test_hex_overflow() {
+        assert_error!(hex("FFFFFFFFFFFFFFFF"))
     }
 }
