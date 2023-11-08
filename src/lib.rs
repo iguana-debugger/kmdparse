@@ -24,27 +24,12 @@ fn hex(input: &str) -> IResult<&str, u32> {
     let (remaining, hex): (&str, &str) =
         take_while(|c: char| is_hex_digit(c as u8) || c == ' ')(input)?;
 
-    // // Removes the whitespace by splitting by whitespace and sticking the splits back together
-    // let hex_no_space = hex.replace(" ", "");
-
-    // // The hex_digit1 is a bit redundant here, but oh well
-    // let (_, res) = map_res(hex_digit1, hex_to_int)(hex)?;
-
     let res = hex_to_int(hex).map_err(|_| {
         nom::Err::Error(nom::error::Error::new(
             input,
             nom::error::ErrorKind::HexDigit,
         ))
     })?;
-
-    // let res = hex.split(' ').map(|hex_str| {
-    //     hex_to_int(hex_str).map_err(|_| {
-    //         nom::Err::Error(nom::error::Error::new(
-    //             input,
-    //             nom::error::ErrorKind::HexDigit,
-    //         ))
-    //     })
-    // });
 
     Ok((remaining, res))
 }
