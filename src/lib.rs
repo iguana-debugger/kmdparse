@@ -1,13 +1,13 @@
-use nom::{
-    branch::alt,
-    bytes::complete::{tag, take_while},
-    character::{complete::hex_digit1, is_hex_digit},
-    combinator::{map_res, recognize},
-    number::complete::hex_u32,
-    AsChar, IResult, Parser,
-};
+mod line;
+mod token;
 
-type Opcode = u32;
+use line::Line;
+use nom::{
+    bytes::complete::{tag, take_while},
+    character::{complete::char, is_hex_digit, is_space},
+    IResult,
+};
+use token::Token;
 
 /// Takes the comment section of a KMD line. This parser basically just takes everything up until a
 /// newline, trimming the newline in the process. Note that \r\n will probably do weird things here.
@@ -54,8 +54,29 @@ fn kmd_tag(input: &str) -> IResult<&str, &str> {
     tag("KMD\n")(input)
 }
 
-pub fn parse_kmd(input: &str) {
+fn line(input: &str) -> IResult<&str, Token> {
+    if let Ok((remaining, _)) = kmd_tag(input) {
+        return Ok((remaining, Token::Tag));
+    }
+
+    let (remaining, memory_address) = hex(input)?;
+    let (remaining, _) = char(':')(remaining)?;
+    let (remaining, _) = take_while(|c| is_space(c as u8))(remaining)?;
+    let (remaining, word) = hex(remaining)?;
+    let (remaining, _) = take_while(|c| is_space(c as u8))(remaining)?;
+    let (remaining, _) = char(';')(remaining)?;
+    let (remaining, comment) = comment(remaining)?;
+
+    Ok((
+        remaining,
+        Token::Line(Line::new(memory_address, word, comment.to_string())),
+    ))
+}
+
+pub fn parse_kmd(input: &str) -> IResult<Vec<Token>, &str> {
     // let (remaining, _) = kmd_tag(input)?;
+
+    todo!()
 }
 
 #[cfg(test)]
@@ -111,5 +132,24 @@ mod tests {
     fn test_comment() {
         let comment_text = "Hello\n";
         assert_done_and_eq!(comment(comment_text), "Hello");
+    }
+
+    #[test]
+    fn test_line_tag() {
+        assert_done_and_eq!(line("KMD\n"), Token::Tag);
+    }
+
+    #[test]
+    fn test_line_line() {
+        let expected = Line::new(
+            0x00000008,
+            0x42757A7A,
+            " buzz    DEFB \"Buzz\",0".to_string(),
+        );
+
+        assert_done_and_eq!(
+            line("00000008: 42 75 7A 7A ; buzz    DEFB \"Buzz\",0\n"),
+            Token::Line(expected)
+        );
     }
 }
