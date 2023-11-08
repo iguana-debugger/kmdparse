@@ -1,8 +1,9 @@
 use nom::{
     bytes::complete::{tag, take_while},
+    character::complete::hex_digit1,
     combinator::map_res,
     number::complete::hex_u32,
-    AsChar, IResult,
+    AsChar, IResult, Parser,
 };
 
 type Opcode = u32;
@@ -19,10 +20,25 @@ fn hex_to_int(input: &str) -> Result<u32, std::num::ParseIntError> {
 fn hex(input: &str) -> IResult<&str, u32> {
     let (remaining, hex): (&str, &str) = take_while(|c: char| c.is_alphanum() || c == ' ')(input)?;
 
-    map_res(
-        nom::bytes::complete::take_while(|c: char| c.is_ascii_hexdigit()),
-        hex_to_int,
-    )(input)
+    // // Removes the whitespace by splitting by whitespace and sticking the splits back together
+    // let hex_no_space = hex.split(' ').collect::<Vec<_>>().concat();
+
+    // // The hex_digit1 is a bit redundant here, but oh well
+    // let (_, res) = map_res(&hex_no_space, hex_to_int)(&hex_no_space)?;
+
+    let res = hex
+        .split(' ')
+        .map(|hex_str| {
+            hex_to_int(hex_str).map_err(|_| {
+                nom::Err::Error(nom::error::Error::new(
+                    input,
+                    nom::error::ErrorKind::HexDigit,
+                ))
+            })
+        })
+        .product::<Result<u32, _>>()?; // Need to do binary shifty stuff
+
+    Ok((remaining, res))
 }
 
 pub fn parse_kmd(input: &str) {
@@ -66,5 +82,10 @@ mod tests {
     #[test]
     fn test_hex_overflow() {
         assert_error!(hex("FFFFFFFFFFFFFFFF"))
+    }
+
+    #[test]
+    fn test_hex_spces() {
+        assert_done_and_eq!(hex("DE AD BE EF"), 0xDEADBEEF)
     }
 }
