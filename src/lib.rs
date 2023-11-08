@@ -9,11 +9,6 @@ use nom::{
 
 type Opcode = u32;
 
-/// Parses the KMD tag at the start of every .kmd file
-fn kmd_tag(input: &str) -> IResult<&str, &str> {
-    tag("KMD\n")(input)
-}
-
 fn hex_to_int(input: &str) -> Result<u32, std::num::ParseIntError> {
     let input_no_space = input.replace(" ", "");
     u32::from_str_radix(&input_no_space, 16)
@@ -46,6 +41,11 @@ fn hex(input: &str) -> IResult<&str, u32> {
     // });
 
     Ok((remaining, res))
+}
+
+/// Parses the KMD tag at the start of every .kmd file
+fn kmd_tag(input: &str) -> IResult<&str, &str> {
+    tag("KMD\n")(input)
 }
 
 pub fn parse_kmd(input: &str) {
