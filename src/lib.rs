@@ -48,6 +48,7 @@ pub fn parse_kmd(input: &str) {
 #[cfg(test)]
 mod tests {
     use nom_test_helpers::{assert_done_and_eq, assert_error, assert_finished};
+    use rayon::prelude::{IntoParallelIterator, ParallelIterator};
 
     use super::*;
 
@@ -71,7 +72,9 @@ mod tests {
 
     #[test]
     fn test_hex_valid() {
-        assert_done_and_eq!(hex("0000000C"), 12)
+        (0..u32::MAX)
+            .into_par_iter()
+            .for_each(|i| assert_done_and_eq!(hex(&format!("{:X}", i)), i))
     }
 
     #[test]
@@ -85,7 +88,7 @@ mod tests {
     }
 
     #[test]
-    fn test_hex_spces() {
+    fn test_hex_spaces() {
         assert_done_and_eq!(hex("DE AD BE EF"), 0xDEADBEEF)
     }
 }
