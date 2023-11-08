@@ -9,6 +9,12 @@ use nom::{
 
 type Opcode = u32;
 
+/// Takes the comment section of a KMD line. This parser basically just takes everything up until a
+/// newline, trimming the newline in the process. Note that \r\n will probably do weird things here.
+fn comment(input: &str) -> IResult<&str, &str> {
+    take_while(|c| c != '\n')(input)
+}
+
 fn hex_to_int(input: &str) -> Result<u32, std::num::ParseIntError> {
     let input_no_space = input.replace(" ", "");
     u32::from_str_radix(&input_no_space, 16)
@@ -99,5 +105,11 @@ mod tests {
     fn test_hex_spaces() {
         assert_done_and_eq!(hex("DE AD BE EF"), 0xDEADBEEF);
         assert_done_and_eq!(hex("0A 00"), 0x0A00);
+    }
+
+    #[test]
+    fn test_comment() {
+        let comment_text = "Hello\n";
+        assert_done_and_eq!(comment(comment_text), "Hello");
     }
 }
