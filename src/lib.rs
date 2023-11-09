@@ -63,7 +63,7 @@ fn line(input: &str) -> IResult<&str, Token> {
 }
 
 pub fn parse_kmd(input: &str) -> IResult<&str, Vec<Token>> {
-    let (remaining, _) = kmd_tag(input)?;
+    let (_, _) = kmd_tag(input)?;
 
     let (remaining, lines) = many1(line)(input)?;
 
@@ -72,7 +72,7 @@ pub fn parse_kmd(input: &str) -> IResult<&str, Vec<Token>> {
 
 #[cfg(test)]
 mod tests {
-    use nom_test_helpers::{assert_done, assert_done_and_eq, assert_error, assert_finished};
+    use nom_test_helpers::{assert_done_and_eq, assert_error, assert_finished};
     use rayon::prelude::{IntoParallelIterator, ParallelIterator};
 
     use super::*;
@@ -147,7 +147,7 @@ mod tests {
     #[test]
     fn test_parse_kmd_valid() {
         let example = include_str!("01-fourbuzz.kmd");
-        let (remaining, lines) = parse_kmd(example).unwrap();
+        let (_, lines) = parse_kmd(example).unwrap();
 
         assert_eq!(lines.len(), 65)
     }
@@ -155,7 +155,7 @@ mod tests {
     #[test]
     fn test_parse_kmd_valid_crlf() {
         let example = include_str!("01-fourbuzz.kmd").replace("\n", "\r\n");
-        let (remaining, lines) = parse_kmd(&example).unwrap();
+        let (_, lines) = parse_kmd(&example).unwrap();
 
         assert_eq!(lines.len(), 65)
     }
