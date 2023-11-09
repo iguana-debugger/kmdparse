@@ -77,6 +77,9 @@ mod tests {
 
     use super::*;
 
+    static EXAMPLE: &'static str = include_str!("hello.kmd");
+    static EXAMPLE_LINES: usize = 22;
+
     #[test]
     fn test_kmd_tag_valid() {
         assert_finished!(kmd_tag("KMD\n"));
@@ -146,17 +149,16 @@ mod tests {
 
     #[test]
     fn test_parse_kmd_valid() {
-        let example = include_str!("01-fourbuzz.kmd");
-        let (_, lines) = parse_kmd(example).unwrap();
+        let (_, lines) = parse_kmd(EXAMPLE).unwrap();
 
-        assert_eq!(lines.len(), 65)
+        assert_eq!(lines.len(), EXAMPLE_LINES)
     }
 
     #[test]
     fn test_parse_kmd_valid_crlf() {
-        let example = include_str!("01-fourbuzz.kmd").replace("\n", "\r\n");
+        let example = include_str!("hello.kmd").replace("\n", "\r\n");
         let (_, lines) = parse_kmd(&example).unwrap();
 
-        assert_eq!(lines.len(), 65)
+        assert_eq!(lines.len(), EXAMPLE_LINES)
     }
 }
