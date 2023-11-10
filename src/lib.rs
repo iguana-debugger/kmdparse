@@ -1,12 +1,17 @@
+mod label;
 mod line;
 mod token;
 
+use label::Label;
 use line::Line;
 use nom::{
     branch::alt,
     bytes::complete::{tag, take_while},
-    character::{complete::char, is_hex_digit, is_space},
-    combinator::opt,
+    character::{
+        complete::{alpha0, char, multispace0},
+        is_hex_digit, is_space,
+    },
+    combinator::{opt, value},
     multi::many1,
     IResult,
 };
@@ -42,6 +47,45 @@ fn kmd_tag(input: &str) -> IResult<&str, &str> {
     alt((tag("KMD\r\n"), tag("KMD\n")))(input)
 }
 
+fn label(input: &str) -> IResult<&str, Label> {
+    // Take the leading colon and space
+    let (remaining, _) = tag(": ")(input)?;
+
+    // Take the name (any alphanumeric character)
+    let (remaining, name) = alpha0(remaining)?; // Can you have functions with numbers?
+
+    // Take the trailing spaces
+    let (remaining, _) = multispace0(remaining)?;
+
+    let (remaining, memory_address) = hex(remaining)?;
+
+    let (remaining, _) = multispace0(remaining)?;
+
+    // aasm is really sneaky about adding two dashes to local
+    let (remaining, is_exported) = alt((
+        value(true, tag("Global - ")),
+        value(false, tag("Local -- ")),
+    ))(remaining)?;
+
+    let (remaining, is_thumb) =
+        alt((value(true, tag("Thumb")), value(false, tag("ARM"))))(remaining)?;
+
+    // Take the newline off the end
+    let (remaining, _) = alt((tag("\r\n"), tag("\n")))(remaining)?;
+
+    Ok((
+        remaining,
+        Label::new(name.to_string(), memory_address, is_exported, is_thumb),
+    ))
+}
+
+fn label_title(input: &str) -> IResult<&str, &str> {
+    alt((
+        tag("Symbol Table: Labels\n"),
+        tag("Symbol Table: Labels\r\n"),
+    ))(input)
+}
+
 fn line(input: &str) -> IResult<&str, Token> {
     if let Ok((remaining, _)) = kmd_tag(input) {
         return Ok((remaining, Token::Tag));
@@ -72,7 +116,9 @@ pub fn parse_kmd(input: &str) -> IResult<&str, Vec<Token>> {
 
 #[cfg(test)]
 mod tests {
-    use nom_test_helpers::{assert_done_and_eq, assert_error, assert_finished};
+    use nom_test_helpers::{
+        assert_done_and_eq, assert_error, assert_finished, assert_finished_and_eq,
+    };
     use rayon::prelude::{IntoParallelIterator, ParallelIterator};
 
     use super::*;
@@ -160,5 +206,37 @@ mod tests {
         let (_, lines) = parse_kmd(&example).unwrap();
 
         assert_eq!(lines.len(), EXAMPLE_LINES)
+    }
+
+    #[test]
+    fn test_label_valid_local_arm() {
+        let input = ": hello                             00000004  Local -- ARM\n";
+        let expected = Label::new("hello".to_string(), 0x00000004, false, false);
+
+        assert_finished_and_eq!(label(input), expected);
+    }
+
+    #[test]
+    fn test_label_valid_exported_arm() {
+        let input = ": hello                             00000004  Global - ARM\n";
+        let expected = Label::new("hello".to_string(), 0x00000004, true, false);
+
+        assert_finished_and_eq!(label(input), expected);
+    }
+
+    #[test]
+    fn test_label_valid_local_thumb() {
+        let input = ": hello                             00000004  Local -- Thumb\n";
+        let expected = Label::new("hello".to_string(), 0x00000004, false, true);
+
+        assert_finished_and_eq!(label(input), expected);
+    }
+
+    #[test]
+    fn test_label_valid_exported_thumb() {
+        let input = ": hello                             00000004  Global - Thumb\n";
+        let expected = Label::new("hello".to_string(), 0x00000004, true, true);
+
+        assert_finished_and_eq!(label(input), expected);
     }
 }
