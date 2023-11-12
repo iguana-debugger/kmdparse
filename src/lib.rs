@@ -12,7 +12,7 @@ use nom::{
         is_hex_digit, is_space,
     },
     combinator::{opt, value},
-    multi::many1,
+    multi::{many0, many1},
     IResult,
 };
 use token::Token;
@@ -47,7 +47,7 @@ fn kmd_tag(input: &str) -> IResult<&str, &str> {
     alt((tag("KMD\r\n"), tag("KMD\n")))(input)
 }
 
-fn label(input: &str) -> IResult<&str, Label> {
+fn label(input: &str) -> IResult<&str, Token> {
     // Take the leading colon and space
     let (remaining, _) = tag(": ")(input)?;
 
@@ -75,7 +75,12 @@ fn label(input: &str) -> IResult<&str, Label> {
 
     Ok((
         remaining,
-        Label::new(name.to_string(), memory_address, is_exported, is_thumb),
+        Token::Label(Label::new(
+            name.to_string(),
+            memory_address,
+            is_exported,
+            is_thumb,
+        )),
     ))
 }
 
@@ -107,9 +112,16 @@ fn line(input: &str) -> IResult<&str, Token> {
 }
 
 pub fn parse_kmd(input: &str) -> IResult<&str, Vec<Token>> {
-    let (_, _) = kmd_tag(input)?;
+    let (remaining, _) = kmd_tag(input)?;
 
-    let (remaining, lines) = many1(line)(input)?;
+    let (remaining, mut lines) = many1(line)(remaining)?;
+
+    let (remaining, _) = alt((tag("\r\n"), tag("\n")))(remaining)?;
+    let (remaining, _) = label_title(remaining)?;
+
+    let (remaining, mut labels) = many0(label)(remaining)?;
+
+    lines.append(&mut labels);
 
     Ok((remaining, lines))
 }
@@ -124,7 +136,7 @@ mod tests {
     use super::*;
 
     static EXAMPLE: &'static str = include_str!("hello.kmd");
-    static EXAMPLE_LINES: usize = 22;
+    static EXAMPLE_LINES: usize = 24;
 
     #[test]
     fn test_kmd_tag_valid() {
@@ -211,7 +223,7 @@ mod tests {
     #[test]
     fn test_label_valid_local_arm() {
         let input = ": hello                             00000004  Local -- ARM\n";
-        let expected = Label::new("hello".to_string(), 0x00000004, false, false);
+        let expected = Token::Label(Label::new("hello".to_string(), 0x00000004, false, false));
 
         assert_finished_and_eq!(label(input), expected);
     }
@@ -219,7 +231,7 @@ mod tests {
     #[test]
     fn test_label_valid_exported_arm() {
         let input = ": hello                             00000004  Global - ARM\n";
-        let expected = Label::new("hello".to_string(), 0x00000004, true, false);
+        let expected = Token::Label(Label::new("hello".to_string(), 0x00000004, true, false));
 
         assert_finished_and_eq!(label(input), expected);
     }
@@ -227,7 +239,7 @@ mod tests {
     #[test]
     fn test_label_valid_local_thumb() {
         let input = ": hello                             00000004  Local -- Thumb\n";
-        let expected = Label::new("hello".to_string(), 0x00000004, false, true);
+        let expected = Token::Label(Label::new("hello".to_string(), 0x00000004, false, true));
 
         assert_finished_and_eq!(label(input), expected);
     }
@@ -235,7 +247,7 @@ mod tests {
     #[test]
     fn test_label_valid_exported_thumb() {
         let input = ": hello                             00000004  Global - Thumb\n";
-        let expected = Label::new("hello".to_string(), 0x00000004, true, true);
+        let expected = Token::Label(Label::new("hello".to_string(), 0x00000004, true, true));
 
         assert_finished_and_eq!(label(input), expected);
     }
