@@ -1,16 +1,16 @@
 #[derive(Debug, PartialEq)]
 pub struct Label {
     /// The name of the label
-    name: String,
+    pub name: String,
 
     /// The associated memory address of the label
-    memory_address: u32,
+    pub memory_address: u32,
 
     /// Whether or not the label is global (true for global, false for local)
-    is_exported: bool,
+    pub is_exported: bool,
 
     /// Whether or not the label points to a Thumb instruction
-    is_thumb: bool,
+    pub is_thumb: bool,
 }
 
 impl Label {

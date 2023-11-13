@@ -1,8 +1,8 @@
 #[derive(Debug, PartialEq)]
 pub struct Line {
-    memory_address: u32,
-    word: Option<u32>,
-    comment: String,
+    pub memory_address: u32,
+    pub word: Option<u32>,
+    pub comment: String,
 }
 
 impl Line {
