@@ -1,6 +1,6 @@
-mod label;
-mod line;
-mod token;
+pub mod label;
+pub mod line;
+pub mod token;
 
 use label::Label;
 use line::Line;
