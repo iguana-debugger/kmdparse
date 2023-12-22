@@ -99,7 +99,7 @@ fn line(input: &str) -> IResult<&str, Token> {
     let (remaining, memory_address) = hex(input)?;
     let (remaining, _) = char(':')(remaining)?;
     let (remaining, _) = take_while(|c| is_space(c as u8))(remaining)?;
-    let (remaining, word) = opt(word)(remaining)?;
+    let (remaining, word) = opt(hex)(remaining)?;
     let (remaining, _) = take_while(|c| is_space(c as u8))(remaining)?;
     let (remaining, _) = char(';')(remaining)?;
     let (remaining, comment) = comment(remaining)?;
@@ -109,45 +109,6 @@ fn line(input: &str) -> IResult<&str, Token> {
         remaining,
         Token::Line(Line::new(memory_address, word, comment.to_string())),
     ))
-}
-
-fn word(input: &str) -> IResult<&str, Vec<u8>> {
-    let (remaining, hex_digits) = take_while(|c: char| c.is_ascii_hexdigit() || c == ' ')(input)?;
-
-    let hex_digits_no_space = hex_digits
-        .chars()
-        .filter(|c| !c.is_ascii_whitespace())
-        .collect::<Vec<_>>();
-
-    // let parsed = hex_digits_no_space
-    //     .chunks(2)
-    //     .try_map(|byte_chars| byte_chars.iter().collect::<String>())
-    //     .try_map(|byte_str| {
-    //         u8::from_str_radix(&byte_str, 16).map_err(|e| {
-    //             nom::Err::Error(nom::error::Error::new(
-    //                 input,
-    //                 nom::error::ErrorKind::HexDigit,
-    //             ))
-    //         })
-    //     })?
-    //     .collect::<Vec<_>>();
-
-    let mut parsed = vec![];
-
-    for chunk in hex_digits_no_space.chunks(2) {
-        let chunk_str = chunk.iter().collect::<String>();
-
-        let hex = u8::from_str_radix(&chunk_str, 16).map_err(|_| {
-            nom::Err::Error(nom::error::Error::new(
-                input,
-                nom::error::ErrorKind::HexDigit,
-            ))
-        })?;
-
-        parsed.push(hex);
-    }
-
-    Ok((remaining, parsed))
 }
 
 pub fn parse_kmd(input: &str) -> IResult<&str, Vec<Token>> {
@@ -234,7 +195,7 @@ mod tests {
     fn test_line_line() {
         let expected = Line::new(
             0x00000008,
-            Some(vec![0x42, 0x75, 0x7A, 0x7A]),
+            Some(0x42757A7A),
             " buzz    DEFB \"Buzz\",0".to_string(),
         );
 
@@ -242,22 +203,6 @@ mod tests {
             line("00000008: 42 75 7A 7A ; buzz    DEFB \"Buzz\",0\n"),
             Token::Line(expected)
         );
-    }
-
-    #[test]
-    fn test_word_valid() {
-        let expected = vec![0xDE, 0xAD, 0xBE, 0xEF];
-
-        assert_done_and_eq!(word("DEADBEEF"), expected);
-        assert_done_and_eq!(word("DE AD BE EF"), expected);
-    }
-
-    #[test]
-    fn test_word_valid_short() {
-        let expected = vec![0xDE, 0xAD];
-
-        assert_done_and_eq!(word("DEAD"), expected);
-        assert_done_and_eq!(word("DE AD"), expected);
     }
 
     #[test]
