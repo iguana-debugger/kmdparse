@@ -1,6 +1,7 @@
 pub mod label;
 pub mod line;
 pub mod token;
+pub mod word;
 
 use label::Label;
 use line::Line;
@@ -13,9 +14,10 @@ use nom::{
     },
     combinator::{opt, value},
     multi::{many0, many1},
-    IResult,
+    AsChar, IResult,
 };
 use token::Token;
+use word::Word;
 
 /// Takes the comment section of a KMD line. This parser basically just takes everything up until a
 /// newline, trimming the newline in the process. Note that \r\n will probably do weird things here.
@@ -111,12 +113,20 @@ fn line(input: &str) -> IResult<&str, Token> {
     ))
 }
 
-fn word(input: &str) -> IResult<&str, Vec<u8>> {
-    let (remaining, hex_digits) = take_while(|c: char| c.is_ascii_hexdigit() || c == ' ')(input)?;
+fn word(input: &str) -> IResult<&str, Word> {
+    let (remaining, hex_digits_untrimmed) =
+        take_while(|c: char| c.is_hex_digit() || c == ' ')(input)?;
+    let hex_digits = hex_digits_untrimmed.trim_end();
+
+    let contains_whitespace = !hex_digits
+        .chars()
+        .collect::<Vec<_>>()
+        .windows(8)
+        .any(|window| window.iter().all(|c| !c.is_whitespace()));
 
     let hex_digits_no_space = hex_digits
         .chars()
-        .filter(|c| !c.is_ascii_whitespace())
+        .filter(|c| !c.is_whitespace())
         .collect::<Vec<_>>();
 
     // let parsed = hex_digits_no_space
@@ -147,7 +157,28 @@ fn word(input: &str) -> IResult<&str, Vec<u8>> {
         parsed.push(hex);
     }
 
-    Ok((remaining, parsed))
+    // If the word contained whitespace, we know that it isn't an instruction.
+    let word = if contains_whitespace {
+        Word::Data(parsed)
+    } else {
+        // The KMD file format stores instructions backwards for reasons that I don't quite
+        // understand, so we flip the bytes around (and convert the vec into an array) here.
+        let arr = parsed
+            .into_iter()
+            .rev()
+            .collect::<Vec<_>>()
+            .try_into()
+            .map_err(|_| {
+                nom::Err::Error(nom::error::Error::new(
+                    input,
+                    nom::error::ErrorKind::TooLarge,
+                ))
+            })?;
+
+        Word::Instruction(arr)
+    };
+
+    Ok((remaining, word))
 }
 
 pub fn parse_kmd(input: &str) -> IResult<&str, Vec<Token>> {
@@ -234,7 +265,7 @@ mod tests {
     fn test_line_line() {
         let expected = Line::new(
             0x00000008,
-            Some(vec![0x42, 0x75, 0x7A, 0x7A]),
+            Some(Word::Data(vec![0x42, 0x75, 0x7A, 0x7A])),
             " buzz    DEFB \"Buzz\",0".to_string(),
         );
 
@@ -246,18 +277,22 @@ mod tests {
 
     #[test]
     fn test_word_valid() {
-        let expected = vec![0xDE, 0xAD, 0xBE, 0xEF];
+        assert_done_and_eq!(
+            word("DEADBEEF"),
+            Word::Instruction([0xEF, 0xBE, 0xAD, 0xDE])
+        );
 
-        assert_done_and_eq!(word("DEADBEEF"), expected);
-        assert_done_and_eq!(word("DE AD BE EF"), expected);
+        assert_done_and_eq!(
+            word("DE AD BE EF"),
+            Word::Data(vec![0xDE, 0xAD, 0xBE, 0xEF])
+        );
     }
 
     #[test]
     fn test_word_valid_short() {
-        let expected = vec![0xDE, 0xAD];
-
-        assert_done_and_eq!(word("DEAD"), expected);
-        assert_done_and_eq!(word("DE AD"), expected);
+        // I think "DEAD" would be valid for data?
+        assert_done_and_eq!(word("DEAD"), Word::Data(vec![0xDE, 0xAD]));
+        assert_done_and_eq!(word("DE AD"), Word::Data(vec![0xDE, 0xAD]));
     }
 
     #[test]
