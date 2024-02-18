@@ -98,8 +98,8 @@ fn line(input: &str) -> IResult<&str, Token> {
         return Ok((remaining, Token::Tag));
     }
 
-    let (remaining, memory_address) = hex(input)?;
-    let (remaining, _) = char(':')(remaining)?;
+    let (remaining, memory_address) = opt(hex)(input)?;
+    let (remaining, _) = opt(char(':'))(remaining)?;
     let (remaining, _) = take_while(|c| is_space(c as u8))(remaining)?;
     let (remaining, word) = opt(word)(remaining)?;
     let (remaining, _) = take_while(|c| is_space(c as u8))(remaining)?;
@@ -264,7 +264,7 @@ mod tests {
     #[test]
     fn test_line_line() {
         let expected = Line::new(
-            0x00000008,
+            Some(0x00000008),
             Some(Word::Data(vec![0x42, 0x75, 0x7A, 0x7A])),
             " buzz    DEFB \"Buzz\",0".to_string(),
         );
