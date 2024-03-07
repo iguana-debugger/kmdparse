@@ -1,6 +1,6 @@
 use crate::word::Word;
 
-#[derive(Debug, PartialEq, Eq)]
+#[derive(Clone, Debug, PartialEq, Eq)]
 pub struct Line {
     pub memory_address: Option<u32>,
     pub word: Option<Word>,
