@@ -1,5 +1,4 @@
-#[derive(Clone, Debug, PartialEq)]
-#[cfg_attr(feature = "uniffi", derive(uniffi::Record))]
+#[derive(Clone, Debug, PartialEq, uniffi::Record)]
 pub struct Label {
     /// The name of the label
     pub name: String,

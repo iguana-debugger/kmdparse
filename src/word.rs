@@ -1,5 +1,4 @@
-#[derive(Clone, Debug, PartialEq, Eq)]
-#[cfg_attr(feature = "uniffi", derive(uniffi::Enum))]
+#[derive(Clone, Debug, PartialEq, Eq, uniffi::Enum)]
 pub enum Word {
     /// An instruction, represented as 4 bytes. kmdparse handles flipping the bytes, so that
     /// instructions are the right way around.
