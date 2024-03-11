@@ -1,5 +1,4 @@
 #[derive(Clone, Debug, PartialEq)]
-#[cfg_attr(feature = "uniffi", derive(uniffi::Record))]
 pub struct Label {
     /// The name of the label
     pub name: String,
@@ -14,7 +13,6 @@ pub struct Label {
     pub is_thumb: bool,
 }
 
-// #[cfg_attr(feature = "uniffi", uniffi::export)]
 impl Label {
     pub fn new(name: String, memory_address: u32, is_exported: bool, is_thumb: bool) -> Self {
         Self {

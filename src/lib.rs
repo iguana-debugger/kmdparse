@@ -3,9 +3,6 @@ pub mod line;
 pub mod token;
 pub mod word;
 
-#[cfg(feature = "uniffi")]
-mod uniffi_array;
-
 use label::Label;
 use line::Line;
 use nom::{
@@ -21,9 +18,6 @@ use nom::{
 };
 use token::Token;
 use word::Word;
-
-#[cfg(feature = "uniffi")]
-uniffi::setup_scaffolding!();
 
 /// Takes the comment section of a KMD line. This parser basically just takes everything up until a
 /// newline, trimming the newline in the process. Note that \r\n will probably do weird things here.
@@ -83,9 +77,12 @@ fn label(input: &str) -> IResult<&str, Token> {
 
     Ok((
         remaining,
-        Token::Label {
-            label: Label::new(name.to_string(), memory_address, is_exported, is_thumb),
-        },
+        Token::Label(Label::new(
+            name.to_string(),
+            memory_address,
+            is_exported,
+            is_thumb,
+        )),
     ))
 }
 
@@ -112,9 +109,7 @@ fn line(input: &str) -> IResult<&str, Token> {
 
     Ok((
         remaining,
-        Token::Line {
-            line: Line::new(memory_address, word, comment.to_string()),
-        },
+        Token::Line(Line::new(memory_address, word, comment.to_string())),
     ))
 }
 
@@ -164,11 +159,11 @@ fn word(input: &str) -> IResult<&str, Word> {
 
     // If the word contained whitespace, we know that it isn't an instruction.
     let word = if contains_whitespace {
-        Word::Data { data: parsed }
+        Word::Data(parsed)
     } else {
         // The KMD file format stores instructions backwards for reasons that I don't quite
         // understand, so we flip the bytes around (and convert the vec into an array) here.
-        let instruction = parsed
+        let arr = parsed
             .into_iter()
             .rev()
             .collect::<Vec<_>>()
@@ -180,7 +175,7 @@ fn word(input: &str) -> IResult<&str, Word> {
                 ))
             })?;
 
-        Word::Instruction { instruction }
+        Word::Instruction(arr)
     };
 
     Ok((remaining, word))
@@ -270,15 +265,13 @@ mod tests {
     fn test_line_line() {
         let expected = Line::new(
             Some(0x00000008),
-            Some(Word::Data {
-                data: vec![0x42, 0x75, 0x7A, 0x7A],
-            }),
+            Some(Word::Data(vec![0x42, 0x75, 0x7A, 0x7A])),
             " buzz    DEFB \"Buzz\",0".to_string(),
         );
 
         assert_done_and_eq!(
             line("00000008: 42 75 7A 7A ; buzz    DEFB \"Buzz\",0\n"),
-            Token::Line { line: expected }
+            Token::Line(expected)
         );
     }
 
@@ -286,34 +279,20 @@ mod tests {
     fn test_word_valid() {
         assert_done_and_eq!(
             word("DEADBEEF"),
-            Word::Instruction {
-                instruction: [0xEF, 0xBE, 0xAD, 0xDE]
-            }
+            Word::Instruction([0xEF, 0xBE, 0xAD, 0xDE])
         );
 
         assert_done_and_eq!(
             word("DE AD BE EF"),
-            Word::Data {
-                data: vec![0xDE, 0xAD, 0xBE, 0xEF]
-            }
+            Word::Data(vec![0xDE, 0xAD, 0xBE, 0xEF])
         );
     }
 
     #[test]
     fn test_word_valid_short() {
         // I think "DEAD" would be valid for data?
-        assert_done_and_eq!(
-            word("DEAD"),
-            Word::Data {
-                data: vec![0xDE, 0xAD]
-            }
-        );
-        assert_done_and_eq!(
-            word("DE AD"),
-            Word::Data {
-                data: vec![0xDE, 0xAD]
-            }
-        );
+        assert_done_and_eq!(word("DEAD"), Word::Data(vec![0xDE, 0xAD]));
+        assert_done_and_eq!(word("DE AD"), Word::Data(vec![0xDE, 0xAD]));
     }
 
     #[test]
@@ -334,9 +313,7 @@ mod tests {
     #[test]
     fn test_label_valid_local_arm() {
         let input = ": hello                             00000004  Local -- ARM\n";
-        let expected = Token::Label {
-            label: Label::new("hello".to_string(), 0x00000004, false, false),
-        };
+        let expected = Token::Label(Label::new("hello".to_string(), 0x00000004, false, false));
 
         assert_finished_and_eq!(label(input), expected);
     }
@@ -344,9 +321,7 @@ mod tests {
     #[test]
     fn test_label_valid_exported_arm() {
         let input = ": hello                             00000004  Global - ARM\n";
-        let expected = Token::Label {
-            label: Label::new("hello".to_string(), 0x00000004, true, false),
-        };
+        let expected = Token::Label(Label::new("hello".to_string(), 0x00000004, true, false));
 
         assert_finished_and_eq!(label(input), expected);
     }
@@ -354,9 +329,7 @@ mod tests {
     #[test]
     fn test_label_valid_local_thumb() {
         let input = ": hello                             00000004  Local -- Thumb\n";
-        let expected = Token::Label {
-            label: Label::new("hello".to_string(), 0x00000004, false, true),
-        };
+        let expected = Token::Label(Label::new("hello".to_string(), 0x00000004, false, true));
 
         assert_finished_and_eq!(label(input), expected);
     }
@@ -364,9 +337,7 @@ mod tests {
     #[test]
     fn test_label_valid_exported_thumb() {
         let input = ": hello                             00000004  Global - Thumb\n";
-        let expected = Token::Label {
-            label: Label::new("hello".to_string(), 0x00000004, true, true),
-        };
+        let expected = Token::Label(Label::new("hello".to_string(), 0x00000004, true, true));
 
         assert_finished_and_eq!(label(input), expected);
     }
