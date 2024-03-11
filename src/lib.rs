@@ -3,7 +3,7 @@ pub mod line;
 pub mod token;
 pub mod word;
 
-// #[cfg(feature = "uniffi")]
+#[cfg(feature = "uniffi")]
 mod uniffi_array;
 
 use label::Label;
@@ -22,7 +22,7 @@ use nom::{
 use token::Token;
 use word::Word;
 
-// #[cfg(feature = "uniffi")]
+#[cfg(feature = "uniffi")]
 uniffi::setup_scaffolding!();
 
 /// Takes the comment section of a KMD line. This parser basically just takes everything up until a
